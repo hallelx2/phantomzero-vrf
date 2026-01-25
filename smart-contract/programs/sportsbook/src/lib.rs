@@ -6,11 +6,12 @@ pub mod instructions;
 pub mod errors;
 pub mod constants;
 pub mod utils;
+pub mod vrf;
 
 use instructions::*;
 use state::*;
 
-declare_id!("Spo7t111111111111111111111111111111111111111");
+declare_id!("Spo7t11111111111111111111111111111111111111");
 
 #[program]
 pub mod sportsbook {
@@ -93,5 +94,21 @@ pub mod sportsbook {
         shares: u64,
     ) -> Result<()> {
         instructions::liquidity::remove_liquidity(ctx, shares)
+    }
+
+    /// Request VRF randomness for a round
+    pub fn request_vrf_randomness(
+        ctx: Context<RequestVrfRandomness>,
+        round_id: u64,
+    ) -> Result<()> {
+        instructions::vrf_request::handler(ctx, round_id)
+    }
+
+    /// Fulfill VRF request and extract match results
+    pub fn fulfill_vrf_request(
+        ctx: Context<FulfillVrfRequest>,
+        round_id: u64,
+    ) -> Result<()> {
+        instructions::vrf_fulfill::handler(ctx, round_id)
     }
 }

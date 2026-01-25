@@ -41,9 +41,10 @@ pub struct FinalizeRoundRevenue<'info> {
 }
 
 pub fn handler(ctx: Context<FinalizeRoundRevenue>, round_id: u64) -> Result<()> {
-    let round_accounting = &mut ctx.accounts.round_accounting;
-    let liquidity_pool = &mut ctx.accounts.liquidity_pool;
-    let betting_pool = &mut ctx.accounts.betting_pool;
+    // Extract account infos and keys BEFORE mutable borrows
+    let betting_pool_info = ctx.accounts.betting_pool.to_account_info();
+    let betting_pool_bump = ctx.accounts.betting_pool.bump;
+    let season_pool_share_bps = ctx.accounts.betting_pool.season_pool_share_bps;
 
     // Check actual balance in betting pool contract
     let remaining_in_contract = ctx.accounts.betting_pool_token_account.amount;
@@ -54,12 +55,12 @@ pub fn handler(ctx: Context<FinalizeRoundRevenue>, round_id: u64) -> Result<()> 
 
     if remaining_in_contract > 0 {
         // Season pool gets exactly 2% of ACTUAL USER DEPOSITS
-        let total_user_bets_before_fee = round_accounting
+        let total_user_bets_before_fee = ctx.accounts.round_accounting
             .total_user_deposits
-            .saturating_add(round_accounting.protocol_fee_collected);
+            .saturating_add(ctx.accounts.round_accounting.protocol_fee_collected);
 
         season_share = (total_user_bets_before_fee as u128)
-            .checked_mul(betting_pool.season_pool_share_bps as u128)
+            .checked_mul(season_pool_share_bps as u128)
             .ok_or(SportsbookError::CalculationOverflow)?
             .checked_div(BPS_DENOMINATOR as u128)
             .ok_or(SportsbookError::CalculationOverflow)? as u64;
@@ -74,47 +75,46 @@ pub fn handler(ctx: Context<FinalizeRoundRevenue>, round_id: u64) -> Result<()> 
 
         // Transfer LP's share back to LP pool
         if profit_to_lp > 0 {
-            let betting_pool_key = betting_pool.key();
-            let seeds = &[b"betting_pool".as_ref(), &[betting_pool.bump]];
+            let seeds = &[b"betting_pool".as_ref(), &[betting_pool_bump]];
             let signer = &[&seeds[..]];
 
             let cpi_accounts = Transfer {
                 from: ctx.accounts.betting_pool_token_account.to_account_info(),
                 to: ctx.accounts.lp_token_account.to_account_info(),
-                authority: ctx.accounts.betting_pool.to_account_info(),
+                authority: betting_pool_info,
             };
             let cpi_program = ctx.accounts.token_program.to_account_info();
             let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
             token::transfer(cpi_ctx, profit_to_lp)?;
 
             // Update LP liquidity tracking
-            liquidity_pool.total_liquidity += profit_to_lp;
-            liquidity_pool.total_profit += profit_to_lp;
-            liquidity_pool.available_liquidity = liquidity_pool
+            ctx.accounts.liquidity_pool.total_liquidity += profit_to_lp;
+            ctx.accounts.liquidity_pool.total_profit += profit_to_lp;
+            ctx.accounts.liquidity_pool.available_liquidity = ctx.accounts.liquidity_pool
                 .total_liquidity
-                .saturating_sub(liquidity_pool.locked_reserve);
+                .saturating_sub(ctx.accounts.liquidity_pool.locked_reserve);
         }
 
         // Allocate season pool share (stays in betting pool for season rewards)
         if season_share > 0 {
-            betting_pool.season_reward_pool += season_share;
+            ctx.accounts.betting_pool.season_reward_pool += season_share;
         }
     }
 
     // Track if LP took a loss (paid out more than collected)
-    let total_in_contract = round_accounting
+    let total_in_contract = ctx.accounts.round_accounting
         .total_bet_volume
-        .saturating_add(round_accounting.protocol_seed_amount);
-    let total_paid = round_accounting.total_paid_out;
+        .saturating_add(ctx.accounts.round_accounting.protocol_seed_amount);
+    let total_paid = ctx.accounts.round_accounting.total_paid_out;
 
     if total_paid > total_in_contract {
         loss_from_lp = total_paid - total_in_contract;
-        liquidity_pool.total_loss += loss_from_lp;
+        ctx.accounts.liquidity_pool.total_loss += loss_from_lp;
     }
 
-    round_accounting.lp_revenue_share = profit_to_lp;
-    round_accounting.season_revenue_share = season_share;
-    round_accounting.revenue_distributed = true;
+    ctx.accounts.round_accounting.lp_revenue_share = profit_to_lp;
+    ctx.accounts.round_accounting.season_revenue_share = season_share;
+    ctx.accounts.round_accounting.revenue_distributed = true;
 
     msg!("Round {} revenue finalized", round_id);
     msg!("Total in contract: {}", total_in_contract);

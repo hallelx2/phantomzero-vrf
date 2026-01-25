@@ -94,10 +94,14 @@ pub fn handler(
         );
     }
 
-    let betting_pool = &mut ctx.accounts.betting_pool;
-    let round_accounting = &mut ctx.accounts.round_accounting;
-    let liquidity_pool = &mut ctx.accounts.liquidity_pool;
-    let bet = &mut ctx.accounts.bet;
+    // Extract all account infos, keys, and bumps BEFORE any mutable borrows
+    let betting_pool_info = ctx.accounts.betting_pool.to_account_info();
+    let betting_pool_key = ctx.accounts.betting_pool.key();
+    let betting_pool_bump = ctx.accounts.betting_pool.bump;
+    let betting_pool_fee_bps = ctx.accounts.betting_pool.protocol_fee_bps;
+
+    let liquidity_pool_info = ctx.accounts.liquidity_pool.to_account_info();
+    let liquidity_pool_bump = ctx.accounts.liquidity_pool.bump;
 
     // Transfer user's stake
     let cpi_accounts = Transfer {
@@ -111,7 +115,7 @@ pub fn handler(
 
     // Deduct protocol fee
     let protocol_fee = (amount as u128)
-        .checked_mul(betting_pool.protocol_fee_bps as u128)
+        .checked_mul(betting_pool_fee_bps as u128)
         .ok_or(SportsbookError::CalculationOverflow)?
         .checked_div(BPS_DENOMINATOR as u128)
         .ok_or(SportsbookError::CalculationOverflow)? as u64;
@@ -119,32 +123,31 @@ pub fn handler(
     let amount_after_fee = amount.saturating_sub(protocol_fee);
 
     // Transfer fee to treasury
-    let betting_pool_key = betting_pool.key();
     let seeds = &[
         b"betting_pool".as_ref(),
-        &[betting_pool.bump],
+        &[betting_pool_bump],
     ];
     let signer = &[&seeds[..]];
 
     let cpi_accounts = Transfer {
         from: ctx.accounts.betting_pool_token_account.to_account_info(),
         to: ctx.accounts.protocol_treasury_token_account.to_account_info(),
-        authority: ctx.accounts.betting_pool.to_account_info(),
+        authority: betting_pool_info.clone(),
     };
     let cpi_program = ctx.accounts.token_program.to_account_info();
     let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
     token::transfer(cpi_ctx, protocol_fee)?;
 
-    round_accounting.protocol_fee_collected += protocol_fee;
-    round_accounting.total_bet_volume += amount_after_fee;
-    round_accounting.total_user_deposits += amount_after_fee;
+    ctx.accounts.round_accounting.protocol_fee_collected += protocol_fee;
+    ctx.accounts.round_accounting.total_bet_volume += amount_after_fee;
+    ctx.accounts.round_accounting.total_user_deposits += amount_after_fee;
 
     // Determine if this is a parlay
     let is_parlay = match_indices.len() > 1;
 
     // Calculate dynamic parlay multiplier
     let parlay_multiplier = calculate_parlay_multiplier_dynamic(
-        round_accounting,
+        &ctx.accounts.round_accounting,
         &match_indices,
         match_indices.len() as u8,
     );
@@ -157,18 +160,18 @@ pub fn handler(
     );
 
     require!(
-        liquidity_pool.can_cover_payout(max_possible_payout),
+        ctx.accounts.liquidity_pool.can_cover_payout(max_possible_payout),
         SportsbookError::InsufficientLPLiquidity
     );
 
     // Increment parlay count (FOMO mechanism)
     if is_parlay {
-        round_accounting.parlay_count += 1;
+        ctx.accounts.round_accounting.parlay_count += 1;
     }
 
     // Calculate odds-weighted allocations
     let (allocations, total_allocated, lp_borrowed) = calculate_odds_weighted_allocations(
-        round_accounting,
+        &ctx.accounts.round_accounting,
         &match_indices,
         &outcomes,
         amount_after_fee,
@@ -179,52 +182,51 @@ pub fn handler(
     // If we need to borrow from LP, do it now
     if lp_borrowed > 0 {
         require!(
-            liquidity_pool.can_cover_payout(lp_borrowed),
+            ctx.accounts.liquidity_pool.can_cover_payout(lp_borrowed),
             SportsbookError::InsufficientLPLiquidity
         );
 
         // Update state BEFORE external call (Checks-Effects-Interactions)
-        round_accounting.lp_borrowed_for_bets += lp_borrowed;
+        ctx.accounts.round_accounting.lp_borrowed_for_bets += lp_borrowed;
 
         // Transfer borrowed funds from LP to betting pool
-        let betting_pool_key = betting_pool.key();
-        let seeds = &[b"liquidity_pool", betting_pool_key.as_ref(), &[liquidity_pool.bump]];
+        let seeds = &[b"liquidity_pool", betting_pool_key.as_ref(), &[liquidity_pool_bump]];
         let signer = &[&seeds[..]];
 
         let cpi_accounts = Transfer {
             from: ctx.accounts.lp_token_account.to_account_info(),
             to: ctx.accounts.betting_pool_token_account.to_account_info(),
-            authority: ctx.accounts.liquidity_pool.to_account_info(),
+            authority: liquidity_pool_info.clone(),
         };
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
         token::transfer(cpi_ctx, lp_borrowed)?;
 
         // Update LP liquidity
-        liquidity_pool.total_liquidity -= lp_borrowed;
-        liquidity_pool.available_liquidity = liquidity_pool
+        ctx.accounts.liquidity_pool.total_liquidity -= lp_borrowed;
+        ctx.accounts.liquidity_pool.available_liquidity = ctx.accounts.liquidity_pool
             .total_liquidity
-            .saturating_sub(liquidity_pool.locked_reserve);
+            .saturating_sub(ctx.accounts.liquidity_pool.locked_reserve);
     }
 
     // Get bet ID and increment
-    let bet_id = betting_pool.next_bet_id;
-    betting_pool.next_bet_id += 1;
+    let bet_id = ctx.accounts.betting_pool.next_bet_id;
+    ctx.accounts.betting_pool.next_bet_id += 1;
 
     // Store bet
-    bet.bettor = ctx.accounts.bettor.key();
-    bet.round_id = round_id;
-    bet.bet_id = bet_id;
-    bet.amount = amount;
-    bet.amount_after_fee = amount_after_fee;
-    bet.allocated_amount = total_allocated;
-    bet.lp_borrowed_amount = lp_borrowed;
-    bet.bonus = 0; // No bonus in unified LP model
-    bet.locked_multiplier = parlay_multiplier;
-    bet.num_predictions = match_indices.len() as u8;
-    bet.settled = false;
-    bet.claimed = false;
-    bet.bump = ctx.bumps.bet;
+    ctx.accounts.bet.bettor = ctx.accounts.bettor.key();
+    ctx.accounts.bet.round_id = round_id;
+    ctx.accounts.bet.bet_id = bet_id;
+    ctx.accounts.bet.amount = amount;
+    ctx.accounts.bet.amount_after_fee = amount_after_fee;
+    ctx.accounts.bet.allocated_amount = total_allocated;
+    ctx.accounts.bet.lp_borrowed_amount = lp_borrowed;
+    ctx.accounts.bet.bonus = 0; // No bonus in unified LP model
+    ctx.accounts.bet.locked_multiplier = parlay_multiplier;
+    ctx.accounts.bet.num_predictions = match_indices.len() as u8;
+    ctx.accounts.bet.settled = false;
+    ctx.accounts.bet.claimed = false;
+    ctx.accounts.bet.bump = ctx.bumps.bet;
 
     // Add predictions and update pools
     let mut predictions = [Prediction {
@@ -245,11 +247,11 @@ pub fn handler(
         };
 
         // Add to appropriate match pool
-        let pool = &mut round_accounting.match_pools[match_index as usize];
+        let pool = &mut ctx.accounts.round_accounting.match_pools[match_index as usize];
         pool.add_to_pool(outcome, allocation);
     }
 
-    bet.predictions = predictions;
+    ctx.accounts.bet.predictions = predictions;
 
     msg!("Bet {} placed successfully", bet_id);
     msg!("Amount: {}, After fee: {}", amount, amount_after_fee);

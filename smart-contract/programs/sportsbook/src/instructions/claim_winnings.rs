@@ -57,12 +57,16 @@ pub fn handler(
     bet_id: u64,
     min_payout: u64,
 ) -> Result<()> {
-    let bet = &mut ctx.accounts.bet;
-    let round_accounting = &mut ctx.accounts.round_accounting;
-    let liquidity_pool = &mut ctx.accounts.liquidity_pool;
+    // Extract account infos and keys BEFORE mutable borrows
+    let betting_pool_info = ctx.accounts.betting_pool.to_account_info();
+    let betting_pool_key = ctx.accounts.betting_pool.key();
+    let betting_pool_bump = ctx.accounts.betting_pool.bump;
+
+    let liquidity_pool_info = ctx.accounts.liquidity_pool.to_account_info();
+    let liquidity_pool_bump = ctx.accounts.liquidity_pool.bump;
 
     // Calculate if bet won and payout amount
-    let (won, base_payout, final_payout) = calculate_bet_payout(bet, round_accounting)?;
+    let (won, base_payout, final_payout) = calculate_bet_payout(&ctx.accounts.bet, &ctx.accounts.round_accounting)?;
 
     // Slippage protection
     require!(
@@ -70,32 +74,31 @@ pub fn handler(
         SportsbookError::PayoutBelowMinimum
     );
 
-    bet.claimed = true;
-    bet.settled = true;
+    ctx.accounts.bet.claimed = true;
+    ctx.accounts.bet.settled = true;
 
     if won && final_payout > 0 {
         // Check per-round payout cap
         require!(
-            round_accounting.total_paid_out + final_payout <= MAX_ROUND_PAYOUTS,
+            ctx.accounts.round_accounting.total_paid_out + final_payout <= MAX_ROUND_PAYOUTS,
             SportsbookError::RoundPayoutLimitReached
         );
 
-        round_accounting.total_claimed += final_payout;
-        round_accounting.total_paid_out += final_payout;
+        ctx.accounts.round_accounting.total_claimed += final_payout;
+        ctx.accounts.round_accounting.total_paid_out += final_payout;
 
         // Pay from betting pool's balance first, pull from LP if insufficient
         let betting_pool_balance = ctx.accounts.betting_pool_token_account.amount;
 
         if betting_pool_balance >= final_payout {
             // Betting pool has enough, pay directly
-            let betting_pool_key = ctx.accounts.betting_pool.key();
-            let seeds = &[b"betting_pool".as_ref(), &[ctx.accounts.betting_pool.bump]];
+            let seeds = &[b"betting_pool".as_ref(), &[betting_pool_bump]];
             let signer = &[&seeds[..]];
 
             let cpi_accounts = Transfer {
                 from: ctx.accounts.betting_pool_token_account.to_account_info(),
                 to: ctx.accounts.bettor_token_account.to_account_info(),
-                authority: ctx.accounts.betting_pool.to_account_info(),
+                authority: betting_pool_info.clone(),
             };
             let cpi_program = ctx.accounts.token_program.to_account_info();
             let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
@@ -106,14 +109,13 @@ pub fn handler(
 
             // Pay what betting pool has
             if betting_pool_balance > 0 {
-                let betting_pool_key = ctx.accounts.betting_pool.key();
-                let seeds = &[b"betting_pool".as_ref(), &[ctx.accounts.betting_pool.bump]];
+                let seeds = &[b"betting_pool".as_ref(), &[betting_pool_bump]];
                 let signer = &[&seeds[..]];
 
                 let cpi_accounts = Transfer {
                     from: ctx.accounts.betting_pool_token_account.to_account_info(),
                     to: ctx.accounts.bettor_token_account.to_account_info(),
-                    authority: ctx.accounts.betting_pool.to_account_info(),
+                    authority: betting_pool_info.clone(),
                 };
                 let cpi_program = ctx.accounts.token_program.to_account_info();
                 let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
@@ -121,28 +123,27 @@ pub fn handler(
             }
 
             // Pull shortfall from LP
-            let betting_pool_key = ctx.accounts.betting_pool.key();
-            let seeds = &[b"liquidity_pool", betting_pool_key.as_ref(), &[liquidity_pool.bump]];
+            let seeds = &[b"liquidity_pool", betting_pool_key.as_ref(), &[liquidity_pool_bump]];
             let signer = &[&seeds[..]];
 
             let cpi_accounts = Transfer {
                 from: ctx.accounts.lp_token_account.to_account_info(),
                 to: ctx.accounts.bettor_token_account.to_account_info(),
-                authority: ctx.accounts.liquidity_pool.to_account_info(),
+                authority: liquidity_pool_info,
             };
             let cpi_program = ctx.accounts.token_program.to_account_info();
             let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
             token::transfer(cpi_ctx, shortfall)?;
 
             // Update LP liquidity
-            liquidity_pool.total_liquidity -= shortfall;
-            liquidity_pool.available_liquidity = liquidity_pool
+            ctx.accounts.liquidity_pool.total_liquidity -= shortfall;
+            ctx.accounts.liquidity_pool.available_liquidity = ctx.accounts.liquidity_pool
                 .total_liquidity
-                .saturating_sub(liquidity_pool.locked_reserve);
+                .saturating_sub(ctx.accounts.liquidity_pool.locked_reserve);
         }
 
         msg!("Bet {} won! Paid out {} tokens", bet_id, final_payout);
-        msg!("Base payout: {}, Parlay multiplier: {}", base_payout, bet.locked_multiplier);
+        msg!("Base payout: {}, Parlay multiplier: {}", base_payout, ctx.accounts.bet.locked_multiplier);
     } else {
         msg!("Bet {} lost", bet_id);
     }
