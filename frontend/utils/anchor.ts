@@ -1,26 +1,18 @@
-import { Program, AnchorProvider, Idl, setProvider } from '@coral-xyz/anchor';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
+import { Connection, PublicKey, SystemProgram } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
 import { AnchorWallet } from '@solana/wallet-adapter-react';
+import { IDL, Sportsbook } from './idl';
 
-// Replace with your actual program ID
+// Program ID from the smart contract
 export const PROGRAM_ID = new PublicKey('Spo7t11111111111111111111111111111111111111');
-
-// You'll need to copy the IDL from your Anchor program
-// This is a placeholder - you need to generate the actual IDL with `anchor build`
-export const SPORTSBOOK_IDL: Idl = {
-  version: '0.1.0',
-  name: 'sportsbook',
-  instructions: [],
-  accounts: [],
-};
 
 export function getProgram(connection: Connection, wallet: AnchorWallet) {
   const provider = new AnchorProvider(connection, wallet, {
     commitment: 'confirmed',
   });
-  setProvider(provider);
 
-  const program = new Program(SPORTSBOOK_IDL, PROGRAM_ID, provider);
+  const program = new Program<Sportsbook>(IDL, PROGRAM_ID, provider);
   return program;
 }
 
@@ -63,4 +55,28 @@ export function getBetPDA(
     [Buffer.from('bet'), bettingPool.toBuffer(), betIdBuffer],
     PROGRAM_ID
   );
+}
+
+export function getLpPositionPDA(
+  liquidityPool: PublicKey,
+  provider: PublicKey
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('lp_position'), liquidityPool.toBuffer(), provider.toBuffer()],
+    PROGRAM_ID
+  );
+}
+
+// Helper to get token account for a wallet
+export async function getOrCreateTokenAccount(
+  connection: Connection,
+  wallet: PublicKey,
+  mint: PublicKey
+): Promise<PublicKey> {
+  return await getAssociatedTokenAddress(mint, wallet);
+}
+
+// Convert number to BN for Anchor
+export function toBN(value: number | string): BN {
+  return new BN(value);
 }

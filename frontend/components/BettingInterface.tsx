@@ -3,6 +3,11 @@
 import { useState } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
+import { placeBetTransaction } from '@/utils/transactions';
+
+// TODO: Replace with your actual token mint
+const TOKEN_MINT = new PublicKey('So11111111111111111111111111111111111111112'); // Devnet WSOL for now
+const CURRENT_ROUND_ID = 0; // TODO: Fetch from betting pool
 
 interface Match {
   id: number;
@@ -84,26 +89,50 @@ export default function BettingInterface() {
   };
 
   const handlePlaceBet = async () => {
-    if (!publicKey || selectedBets.length === 0 || !betAmount) return;
+    if (!publicKey || selectedBets.length === 0 || !betAmount || !sendTransaction) return;
 
     setLoading(true);
     try {
-      // TODO: Implement actual transaction
-      // 1. Get program and betting pool
-      // 2. Prepare match indices and outcomes
-      // 3. Call place_bet instruction
-      // 4. Send transaction
+      // Prepare match indices and outcomes arrays
+      const matchIndices = selectedBets.map((b) => b.matchId);
+      const outcomes = selectedBets.map((b) => b.outcome);
+
+      // Convert bet amount to lamports (assuming 9 decimals like SOL)
+      const amountLamports = Math.floor(parseFloat(betAmount) * 1e9);
 
       console.log('Placing bet:', {
-        amount: betAmount,
-        bets: selectedBets,
-        expectedPayout: calculatePayout(),
+        roundId: CURRENT_ROUND_ID,
+        matchIndices,
+        outcomes,
+        amount: amountLamports,
       });
 
-      alert('Bet placement coming soon! Transaction logic needs to be implemented.');
-    } catch (error) {
+      // Build the transaction
+      const { transaction, betId } = await placeBetTransaction(
+        connection,
+        { publicKey, signTransaction: async (tx) => tx, signAllTransactions: async (txs) => txs } as any,
+        CURRENT_ROUND_ID,
+        matchIndices,
+        outcomes,
+        amountLamports,
+        TOKEN_MINT
+      );
+
+      // Send and confirm transaction
+      const signature = await sendTransaction(transaction, connection);
+      console.log('Transaction signature:', signature);
+
+      // Wait for confirmation
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      alert(`Bet placed successfully! Bet ID: ${betId}\nSignature: ${signature}`);
+
+      // Clear form
+      setSelectedBets([]);
+      setBetAmount('');
+    } catch (error: any) {
       console.error('Error placing bet:', error);
-      alert('Failed to place bet: ' + error);
+      alert(`Failed to place bet: ${error.message || error}`);
     } finally {
       setLoading(false);
     }

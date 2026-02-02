@@ -2,9 +2,14 @@
 
 import { useState } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { PublicKey } from '@solana/web3.js';
+import { addLiquidityTransaction, removeLiquidityTransaction } from '@/utils/transactions';
+
+// TODO: Replace with your actual token mint
+const TOKEN_MINT = new PublicKey('So11111111111111111111111111111111111111112'); // Devnet WSOL for now
 
 export default function LiquidityPool() {
-  const { publicKey } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
 
   const [depositAmount, setDepositAmount] = useState<string>('');
@@ -25,41 +30,74 @@ export default function LiquidityPool() {
   };
 
   const handleDeposit = async () => {
-    if (!publicKey || !depositAmount) return;
+    if (!publicKey || !depositAmount || !sendTransaction) return;
 
     setLoading(true);
     try {
-      // TODO: Implement actual transaction
-      // 1. Get program and liquidity pool
-      // 2. Transfer tokens to pool
-      // 3. Call add_liquidity instruction
-      // 4. Receive LP shares
+      // Convert deposit amount to lamports (assuming 9 decimals like SOL)
+      const amountLamports = Math.floor(parseFloat(depositAmount) * 1e9);
 
-      console.log('Depositing:', depositAmount);
-      alert('Deposit functionality coming soon!');
-    } catch (error) {
+      console.log('Adding liquidity:', amountLamports);
+
+      // Build the transaction
+      const transaction = await addLiquidityTransaction(
+        connection,
+        { publicKey, signTransaction: async (tx) => tx, signAllTransactions: async (txs) => txs } as any,
+        amountLamports,
+        TOKEN_MINT
+      );
+
+      // Send and confirm transaction
+      const signature = await sendTransaction(transaction, connection);
+      console.log('Transaction signature:', signature);
+
+      // Wait for confirmation
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      alert(`Liquidity added successfully!\nSignature: ${signature}`);
+
+      // Clear form
+      setDepositAmount('');
+    } catch (error: any) {
       console.error('Error depositing:', error);
-      alert('Failed to deposit: ' + error);
+      alert(`Failed to deposit: ${error.message || error}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleWithdraw = async () => {
-    if (!publicKey || !withdrawShares) return;
+    if (!publicKey || !withdrawShares || !sendTransaction) return;
 
     setLoading(true);
     try {
-      // TODO: Implement actual transaction
-      // 1. Get program and liquidity pool
-      // 2. Call remove_liquidity instruction
-      // 3. Receive tokens back
+      // Convert shares to integer
+      const sharesAmount = Math.floor(parseFloat(withdrawShares));
 
-      console.log('Withdrawing shares:', withdrawShares);
-      alert('Withdraw functionality coming soon!');
-    } catch (error) {
+      console.log('Removing liquidity:', sharesAmount);
+
+      // Build the transaction
+      const transaction = await removeLiquidityTransaction(
+        connection,
+        { publicKey, signTransaction: async (tx) => tx, signAllTransactions: async (txs) => txs } as any,
+        sharesAmount,
+        TOKEN_MINT
+      );
+
+      // Send and confirm transaction
+      const signature = await sendTransaction(transaction, connection);
+      console.log('Transaction signature:', signature);
+
+      // Wait for confirmation
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      alert(`Liquidity removed successfully!\nSignature: ${signature}`);
+
+      // Clear form
+      setWithdrawShares('');
+    } catch (error: any) {
       console.error('Error withdrawing:', error);
-      alert('Failed to withdraw: ' + error);
+      alert(`Failed to withdraw: ${error.message || error}`);
     } finally {
       setLoading(false);
     }

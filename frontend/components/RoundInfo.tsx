@@ -2,6 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { PublicKey } from '@solana/web3.js';
+import { claimWinningsTransaction } from '@/utils/transactions';
+
+// TODO: Replace with your actual token mint
+const TOKEN_MINT = new PublicKey('So11111111111111111111111111111111111111112'); // Devnet WSOL for now
 
 interface MatchResult {
   id: number;
@@ -14,11 +19,12 @@ interface MatchResult {
 }
 
 export default function RoundInfo() {
-  const { publicKey } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
 
   const [currentRound, setCurrentRound] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [claimingBetId, setClaimingBetId] = useState<number | null>(null);
 
   // Mock round data - in production, fetch from chain
   const roundData = {
@@ -65,6 +71,48 @@ export default function RoundInfo() {
       claimed: false,
     },
   ];
+
+  const handleClaimWinnings = async (betId: number, expectedPayout: number) => {
+    if (!publicKey || !sendTransaction) return;
+
+    setClaimingBetId(betId);
+    try {
+      // Convert expected payout to lamports (with 1% slippage tolerance)
+      const minPayoutLamports = Math.floor(expectedPayout * 0.99 * 1e9);
+
+      console.log('Claiming winnings:', {
+        betId,
+        roundId: currentRound,
+        minPayout: minPayoutLamports,
+      });
+
+      // Build the transaction
+      const transaction = await claimWinningsTransaction(
+        connection,
+        { publicKey, signTransaction: async (tx) => tx, signAllTransactions: async (txs) => txs } as any,
+        betId,
+        currentRound,
+        minPayoutLamports,
+        TOKEN_MINT
+      );
+
+      // Send and confirm transaction
+      const signature = await sendTransaction(transaction, connection);
+      console.log('Transaction signature:', signature);
+
+      // Wait for confirmation
+      await connection.confirmTransaction(signature, 'confirmed');
+
+      alert(`Winnings claimed successfully!\nSignature: ${signature}`);
+
+      // In production, refresh the bet data here
+    } catch (error: any) {
+      console.error('Error claiming winnings:', error);
+      alert(`Failed to claim winnings: ${error.message || error}`);
+    } finally {
+      setClaimingBetId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -232,10 +280,11 @@ export default function RoundInfo() {
 
                 {!bet.claimed && roundData.status === 'SETTLED' && (
                   <button
-                    className="w-full bg-primary text-dark font-bold py-2 rounded-lg hover:bg-primary/90 transition-colors"
-                    onClick={() => alert('Claim functionality coming soon!')}
+                    onClick={() => handleClaimWinnings(bet.betId, bet.expectedPayout)}
+                    disabled={claimingBetId === bet.betId}
+                    className="w-full bg-primary text-dark font-bold py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Claim Winnings
+                    {claimingBetId === bet.betId ? 'Claiming...' : 'Claim Winnings'}
                   </button>
                 )}
               </div>
