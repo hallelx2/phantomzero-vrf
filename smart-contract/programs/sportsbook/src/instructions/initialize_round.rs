@@ -49,12 +49,10 @@ pub fn handler(ctx: Context<InitializeRound>, round_id: u64) -> Result<()> {
     round_accounting.total_paid_out = 0;
     round_accounting.protocol_fee_collected = 0;
     round_accounting.protocol_revenue_share = 0;
-    round_accounting.lp_revenue_share = 0;
     round_accounting.season_revenue_share = 0;
     round_accounting.revenue_distributed = false;
     round_accounting.protocol_seed_amount = 0;
     round_accounting.seeded = false;
-    round_accounting.lp_borrowed_for_bets = 0;
     round_accounting.total_user_deposits = 0;
     round_accounting.parlay_count = 0;
     round_accounting.round_start_time = Clock::get()?.unix_timestamp;

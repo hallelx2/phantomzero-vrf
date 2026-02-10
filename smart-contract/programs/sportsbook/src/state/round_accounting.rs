@@ -40,11 +40,8 @@ pub struct RoundAccounting {
     /// Protocol fee collected (5% of bets)
     pub protocol_fee_collected: u64,
 
-    /// Protocol revenue share
+    /// Protocol revenue share (all losses go to protocol)
     pub protocol_revenue_share: u64,
-
-    /// LP revenue share
-    pub lp_revenue_share: u64,
 
     /// Season pool revenue share
     pub season_revenue_share: u64,
@@ -57,9 +54,6 @@ pub struct RoundAccounting {
 
     /// Has round been seeded?
     pub seeded: bool,
-
-    /// LP borrowed for bet allocations
-    pub lp_borrowed_for_bets: u64,
 
     /// Actual user deposits (for season pool calculation)
     pub total_user_deposits: u64,
@@ -95,12 +89,10 @@ impl RoundAccounting {
         8 +  // total_paid_out
         8 +  // protocol_fee_collected
         8 +  // protocol_revenue_share
-        8 +  // lp_revenue_share
         8 +  // season_revenue_share
         1 +  // revenue_distributed
         8 +  // protocol_seed_amount
         1 +  // seeded
-        8 +  // lp_borrowed_for_bets
         8 +  // total_user_deposits
         8 +  // parlay_count
         8 +  // round_start_time

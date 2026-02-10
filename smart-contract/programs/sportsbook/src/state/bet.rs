@@ -31,13 +31,10 @@ pub struct Bet {
     /// Amount after protocol fee
     pub amount_after_fee: u64,
 
-    /// Total allocated to pools (includes LP borrowed)
+    /// Total allocated to pools (protocol provides all liquidity)
     pub allocated_amount: u64,
 
-    /// Amount borrowed from LP for this bet
-    pub lp_borrowed_amount: u64,
-
-    /// Protocol stake bonus (deprecated in unified LP model)
+    /// Protocol stake bonus (deprecated)
     pub bonus: u64,
 
     /// Locked parlay multiplier at bet placement (scaled by 1e9)
@@ -55,6 +52,13 @@ pub struct Bet {
     /// Has user claimed winnings?
     pub claimed: bool,
 
+    /// Deadline for claiming (settlement_time + 24 hours)
+    /// After this, anyone can claim with 10% bounty
+    pub claim_deadline: i64,
+
+    /// If claimed via bounty, this is the claimer's address
+    pub bounty_claimer: Option<Pubkey>,
+
     /// Bump seed for PDA
     pub bump: u8,
 }
@@ -67,13 +71,14 @@ impl Bet {
         8 +  // amount
         8 +  // amount_after_fee
         8 +  // allocated_amount
-        8 +  // lp_borrowed_amount
         8 +  // bonus
         8 +  // locked_multiplier
         1 +  // num_predictions
         (10 * 17) + // predictions (10 predictions * 17 bytes each)
         1 +  // settled
         1 +  // claimed
+        8 +  // claim_deadline
+        (1 + 32) + // bounty_claimer (Option<Pubkey>)
         1;   // bump
 
     pub fn get_predictions(&self) -> &[Prediction] {

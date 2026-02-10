@@ -44,6 +44,9 @@ pub enum SportsbookError {
     #[msg("Insufficient LP liquidity")]
     InsufficientLPLiquidity,
 
+    #[msg("Insufficient protocol liquidity to pay winnings")]
+    InsufficientProtocolLiquidity,
+
     #[msg("Insufficient available liquidity for withdrawal")]
     InsufficientAvailableLiquidity,
 

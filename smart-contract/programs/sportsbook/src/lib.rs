@@ -80,22 +80,6 @@ pub mod sportsbook {
         instructions::finalize_revenue::handler(ctx, round_id)
     }
 
-    /// Add liquidity to the LP pool
-    pub fn add_liquidity(
-        ctx: Context<AddLiquidity>,
-        amount: u64,
-    ) -> Result<()> {
-        instructions::liquidity::add_liquidity(ctx, amount)
-    }
-
-    /// Remove liquidity from the LP pool
-    pub fn remove_liquidity(
-        ctx: Context<RemoveLiquidity>,
-        shares: u64,
-    ) -> Result<()> {
-        instructions::liquidity::remove_liquidity(ctx, shares)
-    }
-
     /// Request VRF randomness for a round
     pub fn request_vrf_randomness(
         ctx: Context<RequestVrfRandomness>,
