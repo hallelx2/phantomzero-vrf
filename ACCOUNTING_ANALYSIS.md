@@ -257,3 +257,112 @@ pub fn handler(ctx: Context<FinalizeRoundRevenue>, round_id: u64) -> Result<()> 
 The odds-weighted allocation system is mathematically correct! The issue is purely about:
 - Ensuring protocol has enough capital upfront
 - Accounting for that capital properly at the end
+
+---
+
+## ✅ IMPLEMENTED FIXES (Commit 7a17740)
+
+### Fix 1: Time-Based Revenue Finalization ✅
+
+**Problem Solved:** Cannot calculate `total_reserved_for_winners` without iterating all bets.
+
+**Solution Implemented:**
+```rust
+// finalize_revenue.rs
+let claim_deadline = round_end_time + 86400; // 24 hours
+let finalize_buffer = 3600; // 1 hour  
+let earliest_finalize_time = claim_deadline + finalize_buffer;
+
+require!(
+    current_time >= earliest_finalize_time,
+    SportsbookError::RevenueDistributedBeforeClaims
+);
+```
+
+**How it works:**
+1. Winners have 24 hours to claim 100%
+2. Bounty hunters can claim after 24h (10% bounty)
+3. Protocol can finalize after 25 hours (24h + 1h buffer)
+4. Any unclaimed winnings become protocol profit
+
+**Benefits:**
+- No need to iterate through bets
+- Clean time-based cutoff
+- Bounty system incentivizes timely claims
+- O(10) accounting maintained
+
+---
+
+### Fix 2: Proper Operating Profit Accounting ✅
+
+**Problem Solved:** Protocol profit included seed capital, making it impossible to see actual profit/loss.
+
+**Solution Implemented:**
+```rust
+// finalize_revenue.rs
+let operating_profit = user_deposits as i64 - total_paid as i64;
+
+msg!("Protocol seed: {} (stays in pool)", protocol_seed);
+msg!("User deposits: {}", user_deposits);
+msg!("Total paid: {}", total_paid);
+msg!("Operating profit: {} (negative = loss from seed)", operating_profit);
+msg!("Remaining balance: {}", remaining_in_contract);
+```
+
+**Example:**
+```
+Before fix:
+- Remaining: 999,500
+- "Profit": 999,500 ✗ (includes seed!)
+
+After fix:
+- Seed: 1,000,000 (capital)
+- User deposits: 1,000
+- Payouts: 1,500
+- Operating profit: -500 ✓ (protocol lost 500)
+- Remaining: 999,500 (seed - loss)
+```
+
+---
+
+### Fix 3: Capital Adequacy Check ✅
+
+**Problem Solved:** Users could place bets exceeding protocol's available capital.
+
+**Solution Implemented:**
+```rust
+// place_bet.rs
+let max_possible_payout = calculate_max_payout(
+    amount_after_fee,
+    match_indices.len() as u8,
+    parlay_multiplier,
+);
+
+let current_balance = betting_pool_token_account.amount;
+require!(
+    current_balance >= max_possible_payout,
+    SportsbookError::InsufficientProtocolLiquidity
+);
+```
+
+**How it works:**
+- Before accepting bet, calculate worst-case payout
+- Check protocol has enough tokens to cover it
+- Reject bet if insufficient capital
+- Prevents insolvency scenarios
+
+---
+
+## Summary
+
+✅ **Time-based finalization** - No need to know total reserved
+✅ **Proper profit tracking** - Separates seed from operating profit  
+✅ **Capital check** - Prevents protocol insolvency
+
+The accounting system now:
+1. Works in O(10) time regardless of bet count
+2. Accurately tracks protocol profit/loss per round
+3. Prevents accepting bets protocol can't afford
+4. Uses pull-based claims with bounty incentives
+
+**Result:** Mathematically sound accounting for multi-match parlay system! 🎉
