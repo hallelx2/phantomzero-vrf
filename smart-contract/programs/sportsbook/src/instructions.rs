@@ -7,6 +7,8 @@ pub mod claim_winnings;
 pub mod finalize_revenue;
 pub mod vrf_request;
 pub mod vrf_fulfill;
+pub mod season_prediction;
+pub mod end_season;
 
 pub use initialize::*;
 pub use initialize_round::*;
@@ -17,3 +19,5 @@ pub use claim_winnings::*;
 pub use finalize_revenue::*;
 pub use vrf_request::*;
 pub use vrf_fulfill::*;
+pub use season_prediction::*;
+pub use end_season::*;

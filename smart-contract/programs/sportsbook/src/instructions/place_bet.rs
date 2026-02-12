@@ -45,6 +45,10 @@ pub struct PlaceBet<'info> {
     #[account(mut)]
     pub protocol_treasury_token_account: Account<'info, TokenAccount>,
 
+    /// Optional: User's team token account (for fee discount + odds boost)
+    /// If provided and has balance, user gets benefits
+    pub team_token_account: Option<Account<'info, TokenAccount>>,
+
     #[account(mut)]
     pub bettor: Signer<'info>,
 
@@ -88,6 +92,13 @@ pub fn handler(
     let betting_pool_bump = ctx.accounts.betting_pool.bump;
     let betting_pool_fee_bps = ctx.accounts.betting_pool.protocol_fee_bps;
 
+    // Check if user holds team tokens for benefits
+    let has_team_tokens = if let Some(ref team_token_account) = ctx.accounts.team_token_account {
+        team_token_account.amount >= MIN_TEAM_TOKEN_BALANCE
+    } else {
+        false
+    };
+
     // Transfer user's stake
     let cpi_accounts = Transfer {
         from: ctx.accounts.bettor_token_account.to_account_info(),
@@ -98,9 +109,15 @@ pub fn handler(
     let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
     token::transfer(cpi_ctx, amount)?;
 
-    // Deduct protocol fee
+    // Deduct protocol fee (reduced for team token holders)
+    let fee_bps = if has_team_tokens {
+        TEAM_TOKEN_FEE_BPS
+    } else {
+        betting_pool_fee_bps
+    };
+
     let protocol_fee = (amount as u128)
-        .checked_mul(betting_pool_fee_bps as u128)
+        .checked_mul(fee_bps as u128)
         .ok_or(SportsbookError::CalculationOverflow)?
         .checked_div(BPS_DENOMINATOR as u128)
         .ok_or(SportsbookError::CalculationOverflow)? as u64;
@@ -131,11 +148,24 @@ pub fn handler(
     let is_parlay = match_indices.len() > 1;
 
     // Calculate dynamic parlay multiplier
-    let parlay_multiplier = calculate_parlay_multiplier_dynamic(
+    let mut parlay_multiplier = calculate_parlay_multiplier_dynamic(
         &ctx.accounts.round_accounting,
         &match_indices,
         match_indices.len() as u8,
     );
+
+    // Apply odds boost for team token holders (5% better multiplier)
+    if has_team_tokens {
+        let boost = (parlay_multiplier as u128)
+            .checked_mul(TEAM_TOKEN_ODDS_BOOST_BPS as u128)
+            .ok_or(SportsbookError::CalculationOverflow)?
+            .checked_div(BPS_DENOMINATOR as u128)
+            .ok_or(SportsbookError::CalculationOverflow)? as u64;
+
+        parlay_multiplier = parlay_multiplier.saturating_add(boost);
+
+        msg!("Team token holder: odds boost applied (+{})", boost);
+    }
 
     // CRITICAL: Check protocol has enough capital to cover potential payout
     // This prevents insolvency if multiple large parlays win

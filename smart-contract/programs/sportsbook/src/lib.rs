@@ -95,4 +95,35 @@ pub mod sportsbook {
     ) -> Result<()> {
         instructions::vrf_fulfill::handler(ctx, round_id)
     }
+
+    /// Make a season prediction and receive commemorative NFT
+    pub fn make_season_prediction(
+        ctx: Context<MakeSeasonPrediction>,
+        predicted_team: u8,
+    ) -> Result<()> {
+        instructions::season_prediction::handler(ctx, predicted_team)
+    }
+
+    /// Claim season reward for correct prediction
+    pub fn claim_season_reward(
+        ctx: Context<ClaimSeasonReward>,
+        total_predictors: u64,
+    ) -> Result<()> {
+        instructions::season_prediction::claim_season_reward_handler(ctx, total_predictors)
+    }
+
+    /// End the current season and set winning team
+    pub fn end_season(
+        ctx: Context<EndSeason>,
+        winning_team: u8,
+    ) -> Result<()> {
+        instructions::end_season::handler(ctx, winning_team)
+    }
+
+    /// Start a new season
+    pub fn start_new_season(
+        ctx: Context<StartNewSeason>,
+    ) -> Result<()> {
+        instructions::end_season::start_new_season_handler(ctx)
+    }
 }

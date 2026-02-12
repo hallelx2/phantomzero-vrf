@@ -33,6 +33,23 @@ pub struct BettingPool {
     /// Next round ID counter
     pub next_round_id: u64,
 
+    /// Team token mints (10 teams in the league)
+    /// Each team has its own SPL token that users can hold for benefits
+    pub team_token_mints: [Pubkey; 10],
+
+    /// Season prediction NFT collection mint
+    /// Used to mint NFTs for users who predict the season winner
+    pub season_nft_collection: Pubkey,
+
+    /// Current season ID
+    pub current_season_id: u64,
+
+    /// Season ended flag
+    pub season_ended: bool,
+
+    /// Winning team index for current season (0-9, set when season ends)
+    pub season_winning_team: u8,
+
     /// Bump seed for PDA
     pub bump: u8,
 }
@@ -49,5 +66,10 @@ impl BettingPool {
         8 +  // season_reward_pool
         8 +  // next_bet_id
         8 +  // next_round_id
+        (32 * 10) + // team_token_mints (10 teams)
+        32 + // season_nft_collection
+        8 +  // current_season_id
+        1 +  // season_ended
+        1 +  // season_winning_team
         1;   // bump
 }

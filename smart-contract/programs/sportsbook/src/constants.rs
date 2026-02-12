@@ -98,3 +98,13 @@ pub const MIN_COMPRESSED_ODDS: u64 = 1_250_000_000;  // 1.25x
 pub const MAX_COMPRESSED_ODDS: u64 = 1_950_000_000;  // 1.95x
 pub const RAW_ODDS_MIN: u64 = 1_800_000_000;         // 1.8x raw
 pub const RAW_ODDS_MAX: u64 = 5_500_000_000;         // 5.5x raw
+
+/// TEAM TOKEN HOLDER BENEFITS
+/// Reduced protocol fee for team token holders (2% instead of 5%)
+pub const TEAM_TOKEN_FEE_BPS: u16 = 200;  // 2%
+
+/// Odds boost for team token holders (5% better multiplier)
+pub const TEAM_TOKEN_ODDS_BOOST_BPS: u64 = 500;  // 5%
+
+/// Minimum team token balance required for benefits (1 token with 9 decimals)
+pub const MIN_TEAM_TOKEN_BALANCE: u64 = 1_000_000_000;
