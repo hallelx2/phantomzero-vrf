@@ -1,7 +1,7 @@
 import React from "react"
 import { cn } from "@/utils/cn"
 
-export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {}
+export type CardProps = React.HTMLAttributes<HTMLDivElement>
 
 export function Card({ className, children, ...props }: CardProps) {
   return (

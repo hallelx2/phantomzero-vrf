@@ -1,6 +1,5 @@
 import React, { useState } from "react"
 import { useWallet } from "@solana/wallet-adapter-react"
-import BN from "bn.js"
 import { XIcon } from "lucide-react"
 import { Card, CardHeader } from "@/components/ui/card"
 import { Typography } from "@/components/ui/typography"

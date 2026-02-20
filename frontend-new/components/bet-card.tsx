@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Typography } from "@/components/ui/typography"
 import { useClaimWinnings } from "@/hooks/useClaimWinnings"
-import { formatTokens, formatTimestamp, isPending } from "@/utils/format"
+import { formatTimestamp, formatTokens, isPending } from "@/utils/format"
 import { OUTCOME_LABELS } from "@/config/program"
 import type { BetWithStatus } from "@/types/sportsbook"
 

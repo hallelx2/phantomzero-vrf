@@ -8,9 +8,9 @@ import { Badge } from "@/components/ui/badge"
 import { Spinner } from "@/components/ui/spinner"
 import { useBettingPool } from "@/hooks/useBettingPool"
 import {
-  useMySeasonPrediction,
-  useMakeSeasonPrediction,
   useClaimSeasonReward,
+  useMakeSeasonPrediction,
+  useMySeasonPrediction,
 } from "@/hooks/useSeasonPrediction"
 import { TEAMS } from "@/config/program"
 import BN from "bn.js"
@@ -92,7 +92,7 @@ export default function SeasonPage() {
       </div>
 
       {/* Season status banner */}
-      {seasonEnded && winningTeam !== null && (
+      {seasonEnded && winningTeam != null && (
         <div className="mb-6 rounded-2xl bg-success-50 px-6 py-4">
           <Typography level="body3" className="font-semibold text-success-700">
             Season ended! Winning team: {TEAMS[winningTeam] ?? `Team ${winningTeam}`}

@@ -3,8 +3,8 @@ import { Card } from "@/components/ui/card"
 import { Typography } from "@/components/ui/typography"
 import { OddsButton } from "@/components/odds-button"
 import { formatOdds, isPending } from "@/utils/format"
-import { TEAMS, OUTCOME_LABELS } from "@/config/program"
-import type { LockedOdds, MatchOutcome, BetSlipEntry, OutcomeId } from "@/types/sportsbook"
+import { OUTCOME_LABELS } from "@/config/program"
+import type { BetSlipEntry, LockedOdds, MatchOutcome, OutcomeId } from "@/types/sportsbook"
 
 interface MatchCardProps {
   matchIndex: number
@@ -44,11 +44,6 @@ export function MatchCard({
     if (selectedOutcome === outcome) {
       onDeselect(matchIndex)
       return
-    }
-    const oddsMap: Record<OutcomeId, string> = {
-      1: formatOdds(lockedOdds.homeOdds),
-      2: formatOdds(lockedOdds.awayOdds),
-      3: formatOdds(lockedOdds.drawOdds),
     }
     const oddsFloat: Record<OutcomeId, number> = {
       1: lockedOdds.homeOdds.toNumber() / 1e9,
