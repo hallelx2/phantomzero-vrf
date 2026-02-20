@@ -2,7 +2,7 @@ import { PublicKey } from "@solana/web3.js"
 
 // ── Program address ─────────────────────────────────────────────────────────
 export const PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_PROGRAM_ID ?? "Spo7t11111111111111111111111111111111111111"
+  process.env.NEXT_PUBLIC_PROGRAM_ID ?? "37x9AGp1ipgNfGbuoEVxQtjT5RJnJss6pT3V49TDnm5p"
 )
 
 // ── Token scaling ────────────────────────────────────────────────────────────

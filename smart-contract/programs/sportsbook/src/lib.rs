@@ -11,7 +11,7 @@ pub mod vrf;
 use instructions::*;
 use state::*;
 
-declare_id!("Spo7t11111111111111111111111111111111111111");
+declare_id!("37x9AGp1ipgNfGbuoEVxQtjT5RJnJss6pT3V49TDnm5p");
 
 #[program]
 pub mod sportsbook {

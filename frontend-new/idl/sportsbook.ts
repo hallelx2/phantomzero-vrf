@@ -1,5 +1,5 @@
 // Auto-generated IDL for the PhantomZero VRF Sportsbook program
-// Program ID: Spo7t11111111111111111111111111111111111111
+// Program ID: 37x9AGp1ipgNfGbuoEVxQtjT5RJnJss6pT3V49TDnm5p
 
 export const IDL = {
   version: "0.1.0",
