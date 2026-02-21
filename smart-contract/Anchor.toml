@@ -17,7 +17,7 @@ sportsbook = "Spo7t11111111111111111111111111111111111111"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "https://rpc.ankr.com/solana_devnet"
 wallet = "/home/user/phantomzero-vrf/deploy-keypair.json"
 
 [scripts]
