@@ -7,7 +7,7 @@ use crate::errors::SportsbookError;
 #[instruction(predicted_team: u8)]
 pub struct MakeSeasonPrediction<'info> {
     #[account(mut)]
-    pub betting_pool: Account<'info, BettingPool>,
+    pub betting_pool: Box<Account<'info, BettingPool>>,
 
     #[account(
         init,
@@ -21,7 +21,7 @@ pub struct MakeSeasonPrediction<'info> {
         ],
         bump
     )]
-    pub season_prediction: Account<'info, SeasonPrediction>,
+    pub season_prediction: Box<Account<'info, SeasonPrediction>>,
 
     /// NFT mint for this prediction (PDA)
     #[account(
@@ -37,7 +37,7 @@ pub struct MakeSeasonPrediction<'info> {
         ],
         bump
     )]
-    pub nft_mint: Account<'info, Mint>,
+    pub nft_mint: Box<Account<'info, Mint>>,
 
     /// User's token account to receive the NFT
     #[account(
@@ -46,7 +46,7 @@ pub struct MakeSeasonPrediction<'info> {
         associated_token::mint = nft_mint,
         associated_token::authority = user
     )]
-    pub user_nft_account: Account<'info, TokenAccount>,
+    pub user_nft_account: Box<Account<'info, TokenAccount>>,
 
     #[account(mut)]
     pub user: Signer<'info>,
@@ -112,7 +112,7 @@ pub fn handler(
 #[derive(Accounts)]
 pub struct ClaimSeasonReward<'info> {
     #[account(mut)]
-    pub betting_pool: Account<'info, BettingPool>,
+    pub betting_pool: Box<Account<'info, BettingPool>>,
 
     #[account(
         mut,
@@ -126,15 +126,15 @@ pub struct ClaimSeasonReward<'info> {
         constraint = season_prediction.user == user.key() @ SportsbookError::NotBettor,
         constraint = !season_prediction.claimed_reward @ SportsbookError::BetAlreadyClaimed,
     )]
-    pub season_prediction: Account<'info, SeasonPrediction>,
+    pub season_prediction: Box<Account<'info, SeasonPrediction>>,
 
     /// Betting pool's token account
     #[account(mut)]
-    pub betting_pool_token_account: Account<'info, TokenAccount>,
+    pub betting_pool_token_account: Box<Account<'info, TokenAccount>>,
 
     /// User's token account (receives season rewards)
     #[account(mut)]
-    pub user_token_account: Account<'info, TokenAccount>,
+    pub user_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(mut)]
     pub user: Signer<'info>,

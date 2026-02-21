@@ -11,7 +11,7 @@ use crate::errors::SportsbookError;
 #[instruction(round_id: u64)]
 pub struct RequestVrfRandomness<'info> {
     #[account(mut)]
-    pub betting_pool: Account<'info, BettingPool>,
+    pub betting_pool: Box<Account<'info, BettingPool>>,
 
     #[account(
         mut,
@@ -20,7 +20,7 @@ pub struct RequestVrfRandomness<'info> {
         constraint = round_accounting.seeded @ SportsbookError::RoundNotSeeded,
         constraint = !round_accounting.settled @ SportsbookError::RoundAlreadySettled,
     )]
-    pub round_accounting: Account<'info, RoundAccounting>,
+    pub round_accounting: Box<Account<'info, RoundAccounting>>,
 
     #[account(
         init,
@@ -29,7 +29,7 @@ pub struct RequestVrfRandomness<'info> {
         seeds = [b"vrf_request", betting_pool.key().as_ref(), round_id.to_le_bytes().as_ref()],
         bump
     )]
-    pub vrf_request: Account<'info, VrfRequest>,
+    pub vrf_request: Box<Account<'info, VrfRequest>>,
 
     /// Switchboard VRF account
     /// CHECK: This is validated by the Switchboard program

@@ -9,7 +9,7 @@ use crate::utils::{calculate_parlay_multiplier_dynamic, calculate_odds_weighted_
 #[instruction(round_id: u64)]
 pub struct PlaceBet<'info> {
     #[account(mut)]
-    pub betting_pool: Account<'info, BettingPool>,
+    pub betting_pool: Box<Account<'info, BettingPool>>,
 
     #[account(
         mut,
@@ -18,7 +18,7 @@ pub struct PlaceBet<'info> {
         constraint = round_accounting.seeded @ SportsbookError::RoundNotSeeded,
         constraint = !round_accounting.settled @ SportsbookError::RoundAlreadySettled,
     )]
-    pub round_accounting: Account<'info, RoundAccounting>,
+    pub round_accounting: Box<Account<'info, RoundAccounting>>,
 
     #[account(
         init,
@@ -31,23 +31,23 @@ pub struct PlaceBet<'info> {
         ],
         bump
     )]
-    pub bet: Account<'info, Bet>,
+    pub bet: Box<Account<'info, Bet>>,
 
     /// Bettor's token account
     #[account(mut)]
-    pub bettor_token_account: Account<'info, TokenAccount>,
+    pub bettor_token_account: Box<Account<'info, TokenAccount>>,
 
     /// Betting pool's token account (receives bet funds)
     #[account(mut)]
-    pub betting_pool_token_account: Account<'info, TokenAccount>,
+    pub betting_pool_token_account: Box<Account<'info, TokenAccount>>,
 
     /// Protocol treasury token account (receives fees)
     #[account(mut)]
-    pub protocol_treasury_token_account: Account<'info, TokenAccount>,
+    pub protocol_treasury_token_account: Box<Account<'info, TokenAccount>>,
 
     /// Optional: User's team token account (for fee discount + odds boost)
     /// If provided and has balance, user gets benefits
-    pub team_token_account: Option<Account<'info, TokenAccount>>,
+    pub team_token_account: Option<Box<Account<'info, TokenAccount>>>,
 
     #[account(mut)]
     pub bettor: Signer<'info>,
